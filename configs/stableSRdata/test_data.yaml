@@ -50,7 +50,7 @@ model:
     first_stage_config:
       target: ldm.models.autoencoder.AutoencoderKL
       params:
-        ckpt_path: /mnt/lustre/jywang/code/stable_diffmodels/v2-1_512-ema-pruned.ckpt
+        # ckpt_path: /mnt/lustre/jywang/code/stable_diffmodels/v2-1_512-ema-pruned.ckpt
         embed_dim: 4
         monitor: val/rec_loss
         ddconfig:
@@ -132,8 +132,8 @@ data:
       target: basicsr.data.realesrgan_dataset.RealESRGANDataset
       params:
         queue_size: 180
-        gt_path: '/mnt/lustre/jywang/dataset/df2k_ost/GT/'
-        face_gt_path: '/mnt/lustre/jywang/dataset/FFHQ/512_ffhq/512/'
+        gt_path: ['D:/Vinh/3.Project_working/diffusion/dataset/0_SRDataset/archive/train/DIV2K/DIV2K_train_HR', 'D:/Vinh/3.Project_working/diffusion/dataset/0_SRDataset/archive/train/Flickr2K/', 'D:/Vinh/3.Project_working/diffusion/dataset/0_SRDataset/archive/train/OST/' ]
+        # face_gt_path: '/mnt/lustre/share/jywang/dataset/FFHQ/1024/'
         # gt_path: /mnt/lustre/jywang/dataset/ImageSR/DIV2K/DIV2K_train_HR/
         num_face: 2000
         crop_size: 512
@@ -200,8 +200,8 @@ test_data:
     test:
       target: basicsr.data.realesrgan_dataset.RealESRGANDataset
       params:
-        gt_path: ['/mnt/lustre/share/jywang/dataset/DIV8K/train_HR/', '/mnt/lustre/share/jywang/dataset/df2k_ost/GT/']
-        face_gt_path: '/mnt/lustre/share/jywang/dataset/FFHQ/512_ffhq/512/'
+        gt_path: ['D:/Vinh/3.Project_working/diffusion/dataset/0_SRDataset/archive/train/DIV2K/DIV2K_train_HR', 'D:/Vinh/3.Project_working/diffusion/dataset/0_SRDataset/archive/train/Flickr2K/', 'D:/Vinh/3.Project_working/diffusion/dataset/0_SRDataset/archive/train/OST/' ]
+        # face_gt_path: '/mnt/lustre/share/jywang/dataset/FFHQ/1024/'
         num_face: 2000
         crop_size: 512
         mul_num: 10

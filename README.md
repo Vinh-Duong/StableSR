@@ -170,6 +170,7 @@ python scripts/sr_val_ddpm_text_T_vqganfin_oldcanvas_tile.py --config configs/st
 - Test on 128 --> 512: You need at least 10G GPU memory to run this script (batchsize 2 by default)
 ```
 python scripts/sr_val_ddpm_text_T_vqganfin_old.py --config configs/stableSRNew/v2-finetune_text_T_512.yaml --ckpt CKPT_PATH --vqgan_ckpt VQGANCKPT_PATH --init-img INPUT_PATH --outdir OUT_DIR --ddpm_steps 200 --dec_w 0.5 --colorfix_type adain
+
 ```
 - Test on arbitrary size w/o chop for autoencoder (for results beyond 512): The memory cost depends on your image size, but is usually above 10G.
 ```

@@ -22,6 +22,12 @@ from ldm.data.base import Txt2ImgIterableBaseDataset
 from ldm.util import instantiate_from_config, instantiate_from_config_sr
 from pytorch_lightning.loggers import WandbLogger
 
+import os
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["PL_TORCH_DISTRIBUTED_BACKEND"] = "gloo"
+
+
 
 def get_parser(**parser_kwargs):
     def str2bool(v):
@@ -727,10 +733,10 @@ if __name__ == "__main__":
             pudb.set_trace()
 
 
-    import signal
+    # import signal
 
-    signal.signal(signal.SIGUSR1, melk)
-    signal.signal(signal.SIGUSR2, divein)
+    # signal.signal(signal.SIGUSR1, melk)
+    # signal.signal(signal.SIGUSR2, divein)
 
     # run
     if opt.train:

@@ -284,7 +284,7 @@ class DDPM(pl.LightningModule):
         else:
             raise NotImplementedError("mu not supported")
         # TODO how to choose this term
-        lvlb_weights[0] = lvlb_weights[1]
+        # lvlb_weights[0] = lvlb_weights[1]
         self.register_buffer('lvlb_weights', lvlb_weights, persistent=False)
         assert not torch.isnan(self.lvlb_weights).all()
 
@@ -600,6 +600,7 @@ class LatentDiffusion(DDPM):
             self.register_buffer('scale_factor', torch.tensor(scale_factor))
         self.instantiate_first_stage(first_stage_config)
         self.instantiate_cond_stage(cond_stage_config)
+        
         self.cond_stage_forward = cond_stage_forward
         self.clip_denoised = False
         self.bbox_tokenizer = None
@@ -2123,7 +2124,7 @@ class LatentDiffusionSRTextWT(DDPM):
         if return_original_cond:
             out.append(xc)
 
-        return out
+        return out # [x, c, gt]
 
     @torch.no_grad()
     def decode_first_stage(self, z, predict_cids=False, force_not_quantize=False):
@@ -2291,7 +2292,12 @@ class LatentDiffusionSRTextWT(DDPM):
         loss = self(x, c, gt)
         return loss
 
-    def forward(self, x, c, gt, *args, **kwargs):
+    def forward(self,
+                 x, # z_lq
+                 c, # cond text
+                 gt, # z_gt
+                 *args, 
+                 **kwargs):
         index = np.random.randint(0, self.num_timesteps, size=x.size(0))
         t = torch.from_numpy(index)
         t = t.to(self.device).long()
@@ -2312,8 +2318,16 @@ class LatentDiffusionSRTextWT(DDPM):
         if self.test_gt:
             struc_c = self.structcond_stage_model(gt, t_ori)
         else:
-            struc_c = self.structcond_stage_model(x, t_ori)
-        return self.p_losses(gt, c, struc_c, t, t_ori, x, *args, **kwargs)
+            struc_c = self.structcond_stage_model(x, t_ori) # put z_lq though the encoder time-aware ???
+
+        return self.p_losses(gt, # z_gt
+                             c, # condition text
+                             struc_c, # ??
+                               t, 
+                               t_ori, 
+                               x, # z_lq 
+                               *args, 
+                               **kwargs)
 
     def _rescale_annotations(self, bboxes, crop_coordinates):  # TODO: move to dataset
         def rescale_bbox(bbox):
@@ -2325,7 +2339,12 @@ class LatentDiffusionSRTextWT(DDPM):
 
         return [rescale_bbox(b) for b in bboxes]
 
-    def apply_model(self, x_noisy, t, cond, struct_cond, return_ids=False):
+    def apply_model(self, 
+                    x_noisy, #noise
+                    t, 
+                    cond, 
+                    struct_cond,  # time-aware enc
+                    return_ids=False):
 
         if isinstance(cond, dict):
             # hybrid case, cond is exptected to be a dict
@@ -2447,7 +2466,15 @@ class LatentDiffusionSRTextWT(DDPM):
         kl_prior = normal_kl(mean1=qt_mean, logvar1=qt_log_variance, mean2=0.0, logvar2=0.0)
         return mean_flat(kl_prior) / np.log(2.0)
 
-    def p_losses(self, x_start, cond, struct_cond, t, t_ori, z_gt, noise=None):
+    def p_losses(self, 
+                 x_start, # z_gt
+                 cond, # condition
+                 struct_cond, # time-aware enc
+                 t, 
+                 t_ori, 
+                 z_gt, # z_lq
+                 noise=None):
+        
         noise = default(noise, lambda: torch.randn_like(x_start))
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
 
@@ -2457,7 +2484,11 @@ class LatentDiffusionSRTextWT(DDPM):
                 noise = noise_new * 0.5 + noise * 0.5
                 x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
 
-        model_output = self.apply_model(x_noisy, t_ori, cond, struct_cond)
+        model_output = self.apply_model(x_noisy,
+                                         t_ori, 
+                                         cond, # condi text???
+                                         struct_cond # time encoder-aware
+                                        )
 
         loss_dict = {}
         prefix = 'train' if self.training else 'val'

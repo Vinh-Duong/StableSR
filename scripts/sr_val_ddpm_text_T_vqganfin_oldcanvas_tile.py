@@ -25,7 +25,7 @@ import torch.nn.functional as F
 import cv2
 from util_image import ImageSpliterTh
 from pathlib import Path
-from scripts.wavelet_color_fix import wavelet_reconstruction, adaptive_instance_normalization
+from wavelet_color_fix import wavelet_reconstruction, adaptive_instance_normalization
 
 def space_timesteps(num_timesteps, section_counts):
 	"""
@@ -237,11 +237,11 @@ def main():
 		help="the size for tile operation before VQGAN decoder (in pixel)",
 	)
 	parser.add_argument(
-        "--input_size",
-        type=int,
-        default=512,
-        help="input size",
-    )
+		"--input_size",
+		type=int,
+		default=512,
+		help="input size",
+	)
 
 	opt = parser.parse_args()
 	seed_everything(opt.seed)
@@ -354,7 +354,15 @@ def main():
 							im_spliter = ImageSpliterTh(im_lq_bs, opt.vqgantile_size, opt.vqgantile_stride, sf=1)
 							for im_lq_pch, index_infos in im_spliter:
 								seed_everything(opt.seed)
+
+								b, c, w, h = im_lq_pch.shape
+								print(f"im_lq_pch size before encode is ({w}, {h})")
+
 								init_latent = model.get_first_stage_encoding(model.encode_first_stage(im_lq_pch))  # move to latent space
+
+								b, c, w, h = init_latent.shape
+								print(f"im_lq_pch size after encode is ({w}, {h})")
+					
 								text_init = ['']*opt.n_samples
 								semantic_c = model.cond_stage_model(text_init)
 								noise = torch.randn_like(init_latent)
@@ -365,7 +373,9 @@ def main():
 								# x_T = noise
 								samples, _ = model.sample_canvas(cond=semantic_c, struct_cond=init_latent, batch_size=im_lq_pch.size(0), timesteps=opt.ddpm_steps, time_replace=opt.ddpm_steps, x_T=x_T, return_intermediates=True, tile_size=int(opt.input_size/8), tile_overlap=opt.tile_overlap, batch_size_sample=opt.n_samples)
 								_, enc_fea_lq = vq_model.encode(im_lq_pch)
-								x_samples = vq_model.decode(samples * 1. / model.scale_factor, enc_fea_lq)
+
+								x_samples = vq_model.decode(samples * 1. / model.scale_factor, init_latent)
+
 								if opt.colorfix_type == 'adain':
 									x_samples = adaptive_instance_normalization(x_samples, im_lq_pch)
 								elif opt.colorfix_type == 'wavelet':
@@ -374,7 +384,15 @@ def main():
 							im_sr = im_spliter.gather()
 							im_sr = torch.clamp((im_sr+1.0)/2.0, min=0.0, max=1.0)
 						else:
+							b, c, w, h = im_lq_bs.shape
+							print(f"im_lq_bs size before encode is ({w}, {h})")
+
 							init_latent = model.get_first_stage_encoding(model.encode_first_stage(im_lq_bs))  # move to latent space
+
+							b, c, w, h = init_latent.shape
+							print(f"init_latent size after encode is ({w}, {h})")
+							
+							# init_latent = model.get_first_stage_encoding(model.encode_first_stage(im_lq_bs))  # move to latent space
 							text_init = ['']*opt.n_samples
 							semantic_c = model.cond_stage_model(text_init)
 							noise = torch.randn_like(init_latent)
@@ -386,6 +404,9 @@ def main():
 							samples, _ = model.sample_canvas(cond=semantic_c, struct_cond=init_latent, batch_size=im_lq_bs.size(0), timesteps=opt.ddpm_steps, time_replace=opt.ddpm_steps, x_T=x_T, return_intermediates=True, tile_size=int(opt.input_size/8), tile_overlap=opt.tile_overlap, batch_size_sample=opt.n_samples)
 							_, enc_fea_lq = vq_model.encode(im_lq_bs)
 							x_samples = vq_model.decode(samples * 1. / model.scale_factor, enc_fea_lq)
+
+						
+
 							if opt.colorfix_type == 'adain':
 								x_samples = adaptive_instance_normalization(x_samples, im_lq_bs)
 							elif opt.colorfix_type == 'wavelet':

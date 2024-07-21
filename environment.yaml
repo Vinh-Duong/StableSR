@@ -1,6 +1,8 @@
-name: stablesr
+name: stablesr02
 channels:
+  - xformers
   - pytorch
+  - conda-forge
   - defaults
 dependencies:
   - python=3.9
@@ -23,10 +25,9 @@ dependencies:
     - webdataset==0.2.5
     - kornia==0.6
     - open_clip_torch==2.0.2
-    - invisible-watermark>=0.1.5
+    - invisible-watermark==0.1.5
     - streamlit-drawable-canvas==0.8.0
     - torchmetrics==0.6.0
-    - triton
     - matplotlib
     - wandb
     - pillow
