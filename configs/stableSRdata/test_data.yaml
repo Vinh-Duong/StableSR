@@ -121,6 +121,7 @@ degradation:
   jpeg_range2: [60, 100]
 
   gt_size: 512
+  no_degradation_prob: 0.01
 
 data:
   target: main.DataModuleFromConfig
