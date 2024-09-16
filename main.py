@@ -17,6 +17,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint, Callback, LearningRateM
 from pytorch_lightning.utilities.distributed import rank_zero_only
 # from pytorch_lightning.utilities.rank_zero import rank_zero_only
 from pytorch_lightning.utilities import rank_zero_info
+# pytorch_lightning.utilities.rank_zero
 
 from ldm.data.base import Txt2ImgIterableBaseDataset
 from ldm.util import instantiate_from_config, instantiate_from_config_sr
@@ -24,7 +25,7 @@ from pytorch_lightning.loggers import WandbLogger
 
 import os
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.environ["PL_TORCH_DISTRIBUTED_BACKEND"] = "gloo"
 
 
@@ -260,7 +261,7 @@ class SetupCallback(Callback):
         if trainer.global_rank == 0:
             print("Summoning checkpoint.")
             ckpt_path = os.path.join(self.ckptdir, "last.ckpt")
-            trainer.save_checkpoint(ckpt_path)
+            # trainer.save_checkpoint(ckpt_path)
 
     def on_pretrain_routine_start(self, trainer, pl_module):
         if trainer.global_rank == 0:
@@ -580,14 +581,15 @@ if __name__ == "__main__":
         },
     }
     # We use wandb by default. Change to testtube if you do not want to use wandb
-    default_logger_cfg = default_logger_cfgs["wandb"]
-    os.makedirs(os.path.join(logdir, 'wandb'), exist_ok=True)
+    default_logger_cfg = default_logger_cfgs["testtube"]
+    # os.makedirs(os.path.join(logdir, 'wandb'), exist_ok=True)
     if "logger" in lightning_config:
         logger_cfg = lightning_config.logger
     else:
         logger_cfg = OmegaConf.create()
     logger_cfg = OmegaConf.merge(default_logger_cfg, logger_cfg)
     trainer_kwargs["logger"] = instantiate_from_config(logger_cfg)
+
 
     # modelcheckpoint - use TrainResult/EvalResult(checkpoint_on=metric) to
     # specify which metric is used to determine best models
@@ -628,14 +630,14 @@ if __name__ == "__main__":
                 "lightning_config": lightning_config,
             }
         },
-        "image_logger": {
-            "target": "main.ImageLogger",
-            "params": {
-                "batch_frequency": 750,
-                "max_images": 4,
-                "clamp": True
-            }
-        },
+        # "image_logger": {
+        #     "target": "main.ImageLogger",
+        #     "params": {
+        #         "batch_frequency": 750,
+        #         "max_images": 4,
+        #         "clamp": True
+        #     }
+        # },
         "learning_rate_logger": {
             "target": "main.LearningRateMonitor",
             "params": {
@@ -724,7 +726,7 @@ if __name__ == "__main__":
         if trainer.global_rank == 0:
             print("Summoning checkpoint.")
             ckpt_path = os.path.join(ckptdir, "last.ckpt")
-            trainer.save_checkpoint(ckpt_path)
+            # trainer.save_checkpoint(ckpt_path)
 
 
     def divein(*args, **kwargs):

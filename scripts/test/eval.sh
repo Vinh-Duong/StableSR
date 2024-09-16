@@ -17,12 +17,13 @@ python scripts/sr_val_ddpm_text_T_vqganfin_oldcanvas_tile.py \
 # --ckpt D:/Vinh/3.Project_working/git_tutorial/StableSR/checkpoints/stablesr_768v_000139.ckpt \
 # --vqgan_ckpt D:/Vinh/3.Project_working/git_tutorial/StableSR/checkpoints/vqgan_cfw_00011.ckpt \
 # --init-img D:/Vinh/3.Project_working/diffusion/dataset/test_data/DIV2K_valid_100_750x1000_center_crop_x4 \
-# --outdir D:/Vinh/3.Project_working/diffusion/StableSR/output/DIV2K_valid_100_750x1000_center_crop_x4_stablesr_768v_000139 \
+# --outdir D:/Vinh/3.Project_working/diffusion/StableSR/output/DIV2K_valid_100_750x1000_center_neg_pos_promt2 \
 # --ddim_steps 20 \
 # --dec_w 0.5 \
 # --colorfix_type wavelet \
 # --scale 7.0 \
 # --use_negative_prompt  \
+# --use_posi_prompt \
 # --upscale 4 \
 # --seed 42 \
 # --n_samples 1 \

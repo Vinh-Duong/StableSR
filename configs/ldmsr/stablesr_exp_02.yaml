@@ -1,52 +1,49 @@
 sf: 4
 model:
   base_learning_rate: 5.0e-05
-  target: ldm.models.diffusion.ddpm.LatentDiffusionSRTextWT
+  target: ldm.models.diffusion.ddpm.LatentDiffusionStableSR
   params:
-    # parameterization: "v"
-    linear_start: 0.00085
-    linear_end: 0.0120
-    num_timesteps_cond: 1
-    log_every_t: 200
+    linear_start: 0.0015
+    linear_end: 0.0155
+    log_every_t: 100
     timesteps: 1000
-    first_stage_key: image
-    cond_stage_key: caption
+    loss_type: l2
+    first_stage_key: image #'jpeg' #image
+    cond_stage_key: LR_image #LR_image #LR_image
     image_size: 512
     channels: 4
-    cond_stage_trainable: False   # Note: different from the one we trained before
-    conditioning_key: crossattn
-    # monitor: val/loss_simple_ema
+    concat_mode: True
+    ckpt_path: D:/Vinh/3.Project_working/git_tutorial/StableSR/checkpoints/v2-1_512-ema-pruned.ckpt
+    cond_stage_trainable: false
+    use_usm: True
+    ignore_keys: ['jpeger']
+    conditioning_key: hybrid
+    unfrozen_diff: false
     scale_factor: 0.18215
     use_ema: False
-    # for training only
-    ckpt_path: D:/Vinh/3.Project_working/git_tutorial/StableSR/checkpoints/v2-1_512-ema-pruned.ckpt
-    unfrozen_diff: False
-    random_size: False
-    time_replace: 1000
-    use_usm: True
-    #P2 weighting, we do not use in final version
-    p2_gamma: ~
-    p2_k: ~
-    # ignore_keys: []
+    # in_channels: 8
+    # out_channels: 4
+
 
     unet_config:
-      target: ldm.modules.diffusionmodules.openaimodel.UNetModelDualcondV2
+      target: ldm.modules.diffusionmodules.openaimodel.UNetModel
       params:
         image_size: 32 # unused
-        in_channels: 4
+        in_channels: 8
         out_channels: 4
         model_channels: 320
         attention_resolutions: [ 4, 2, 1 ]
         num_res_blocks: 2
         channel_mult: [ 1, 2, 4, 4 ]
         num_head_channels: 64
+
         use_spatial_transformer: True
         use_linear_in_transformer: True
         transformer_depth: 1
         context_dim: 1024
         use_checkpoint: False
         legacy: False
-        semb_channels: 256
+        # semb_channels: 256
 
     first_stage_config:
       target: ldm.models.autoencoder.AutoencoderKL
@@ -73,33 +70,15 @@ model:
         lossconfig:
           target: torch.nn.Identity
 
+    # cond_stage_config:
+    #   target: torch.nn.Identity
+
     cond_stage_config:
       target: ldm.modules.encoders.modules.FrozenOpenCLIPEmbedder
       params:
         freeze: True
         layer: "penultimate"
 
-    structcond_stage_config:
-      target: ldm.modules.diffusionmodules.openaimodel.EncoderUNetModelWT
-      params:
-        image_size: 96
-        in_channels: 4
-        model_channels: 256
-        out_channels: 256
-        num_res_blocks: 2
-        attention_resolutions: [ 4, 2, 1 ]
-        dropout: 0
-        channel_mult: [ 1, 1, 2, 2 ]
-        conv_resample: True
-        dims: 2
-        use_checkpoint: False
-        use_fp16: False
-        num_heads: 4
-        num_head_channels: -1
-        num_heads_upsample: -1
-        use_scale_shift_norm: False
-        resblock_updown: False
-        use_new_attention_order: False
 
 
 degradation:
@@ -123,25 +102,26 @@ degradation:
   jpeg_range2: [60, 100]
 
   gt_size: 512
-  no_degradation_prob: 0.01
 
 data:
   target: main.DataModuleFromConfig
   params:
-    batch_size: 1
+    batch_size: 2
     num_workers: 6
     wrap: false
     train:
       target: basicsr.data.realesrgan_dataset.RealESRGANDataset
       params:
-        queue_size: 180
         # gt_path: ['/mnt/lustre/share/jywang/dataset/DIV8K/train_HR/', '/mnt/lustre/share/jywang/dataset/df2k_ost/GT/']
-        gt_path: ['D:/Vinh/3.Project_working/diffusion/dataset/0_SRDataset/archive/train/DIV2K/DIV2K_train_HR', 'D:/Vinh/3.Project_working/diffusion/dataset/0_SRDataset/archive/train/Flickr2K/', 'D:/Vinh/3.Project_working/diffusion/dataset/0_SRDataset/archive/train/OST/' ]
         # face_gt_path: '/mnt/lustre/share/jywang/dataset/FFHQ/1024/'
+        gt_path: ['D:/Vinh/3.Project_working/diffusion/dataset/0_SRDataset/archive/train/DIV2K/DIV2K_train_HR', 'D:/Vinh/3.Project_working/diffusion/dataset/0_SRDataset/archive/train/Flickr2K/', 'D:/Vinh/3.Project_working/diffusion/dataset/0_SRDataset/archive/train/OST/' ]
+        face_gt_path: 'D:/Vinh/3.Project_working/diffusion/dataset/0_SRDataset/FFHQ'
         num_face: 10000
         crop_size: 512
         io_backend:
           type: disk
+
+        
 
         blur_kernel_size: 21
         kernel_list: ['iso', 'aniso', 'generalized_iso', 'generalized_aniso', 'plateau_iso', 'plateau_aniso']
@@ -165,43 +145,6 @@ data:
         use_hflip: True
         use_rot: False
     validation:
-      target: basicsr.data.realesrgan_dataset.RealESRGANDataset
-      params:
-        # gt_path: /mnt/lustre/share/jywang/dataset/ImageSR/DIV2K/DIV2K_train_HR/
-        gt_path: D:/Vinh/3.Project_working/diffusion/dataset/0_SRDataset/archive/test/DIV2K_valid/
-        crop_size: 512
-        io_backend:
-          type: disk
-
-        blur_kernel_size: 21
-        kernel_list: ['iso', 'aniso', 'generalized_iso', 'generalized_aniso', 'plateau_iso', 'plateau_aniso']
-        kernel_prob: [0.45, 0.25, 0.12, 0.03, 0.12, 0.03]
-        sinc_prob: 0.1
-        blur_sigma: [0.2, 1.5]
-        betag_range: [0.5, 2.0]
-        betap_range: [1, 1.5]
-
-        blur_kernel_size2: 11
-        kernel_list2: ['iso', 'aniso', 'generalized_iso', 'generalized_aniso', 'plateau_iso', 'plateau_aniso']
-        kernel_prob2: [0.45, 0.25, 0.12, 0.03, 0.12, 0.03]
-        sinc_prob2: 0.1
-        blur_sigma2: [0.2, 1.0]
-        betag_range2: [0.5, 2.0]
-        betap_range2: [1, 1.5]
-
-        final_sinc_prob: 0.8
-
-        gt_size: 512
-        use_hflip: True
-        use_rot: False
-
-test_data:
-  target: main.DataModuleFromConfig
-  params:
-    batch_size: 6
-    num_workers: 6
-    wrap: false
-    test:
       target: basicsr.data.realesrgan_dataset.RealESRGANDataset
       params:
         gt_path: D:/Vinh/3.Project_working/diffusion/dataset/0_SRDataset/archive/test/DIV2K_valid/
@@ -234,16 +177,17 @@ test_data:
 lightning:
   modelcheckpoint:
     params:
-      every_n_train_steps: 1500
+      every_n_train_steps: 500
   callbacks:
     image_logger:
       target: main.ImageLogger
       params:
-        batch_frequency: 500
+        batch_frequency: 1000
         max_images: 4
         increase_log_steps: False
 
   trainer:
     benchmark: True
     max_steps: 800000
-    accumulate_grad_batches: 4
+    accumulate_grad_batches: 3
+

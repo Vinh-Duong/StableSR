@@ -408,15 +408,15 @@ def main():
 							seed_everything(opt.seed)
 							init_latent = model.get_first_stage_encoding(model.encode_first_stage(im_lq_pch))  # move to latent space
 							if opt.use_posi_prompt:
-								text_init = ['(masterpiece:2), (best quality:2), (realistic:2), (very clear:2)']*im_lq_pch.size(0)
-								# text_init = ['Good photo.']*im_lq_pch.size(0)
+								# text_init = ['(masterpiece:2), (best quality:2), (realistic:2), (very clear:2)']*im_lq_pch.size(0)
+								text_init = ['Good photo.']*im_lq_pch.size(0)
 							else:
 								text_init = ['']*im_lq_pch.size(0)
 
 							semantic_c = model.cond_stage_model(text_init)
 							if opt.use_negative_prompt:
-								negative_text_init = ['3d, cartoon, anime, sketches, (worst quality:2), (low quality:2)']*im_lq_pch.size(0)
-								# negative_text_init = ['Bad photo.']*im_lq_pch.size(0)
+								# negative_text_init = ['3d, cartoon, anime, sketches, (worst quality:2), (low quality:2)']*im_lq_pch.size(0)
+								negative_text_init = ['Bad photo.']*im_lq_pch.size(0)
 								nega_semantic_c = model.cond_stage_model(negative_text_init)
 
 							noise = torch.randn_like(init_latent)
