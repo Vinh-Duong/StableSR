@@ -28,7 +28,7 @@ os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.environ["PL_TORCH_DISTRIBUTED_BACKEND"] = "gloo"
 
-
+# os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
 
 def get_parser(**parser_kwargs):
     def str2bool(v):
@@ -744,6 +744,8 @@ if __name__ == "__main__":
     if opt.train:
         try:
             trainer.fit(model, data)
+            # torch.cuda.empty_cache() 
+
         except Exception:
             melk()
             raise

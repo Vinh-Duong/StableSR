@@ -4,10 +4,10 @@ python scripts/sr_val_ddpm_text_T_vqganfin_oldcanvas_tile.py \
 --config configs/stableSRNew/v2-finetune_text_T_512.yaml \
 --ckpt D:/Vinh/3.Project_working/git_tutorial/StableSR/checkpoints/stablesr_turbo.ckpt \
 --vqgan_ckpt D:/Vinh/3.Project_working/git_tutorial/StableSR/checkpoints/vqgan_cfw_00011.ckpt \
---init-img D:/Vinh/3.Project_working/diffusion/StableSR/dataset/ffhq_512/ \
---outdir D:/Vinh/3.Project_working/diffusion/StableSR/output/ffhq_512 \
+--init-img D:/Vinh/3.Project_working/diffusion/dataset/test_data/DIV2K_valid_100_750x1000_center_crop_x4 \
+--outdir ./outputs/stablesr_exp_02/stablesr_0.0 \
 --ddpm_steps 4 \
---dec_w 0.5 \
+--dec_w 0.0 \
 --colorfix_type wavelet
 
 

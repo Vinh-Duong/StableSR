@@ -435,6 +435,7 @@ def main():
 															 tile_size=opt.input_size//8,
 															 tile_overlap=opt.tile_overlap,
 															 batch_size=opt.n_samples)
+							
 							_, enc_fea_lq = vq_model.encode(im_lq_pch)
 							x_samples = vq_model.decode(samples * 1. / model.scale_factor, enc_fea_lq)
 							if opt.colorfix_type == 'adain':
@@ -473,6 +474,7 @@ def main():
 														 tile_size=opt.input_size//8,
 														 tile_overlap=opt.tile_overlap,
 														 batch_size=opt.n_samples)
+						
 						_, enc_fea_lq = vq_model.encode(im_lq_bs)
 						x_samples = vq_model.decode(samples * 1. / model.scale_factor, enc_fea_lq)
 						if opt.colorfix_type == 'adain':

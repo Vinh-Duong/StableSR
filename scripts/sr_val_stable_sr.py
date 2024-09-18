@@ -293,36 +293,20 @@ def main():
 			images_path.remove(item)
 	print(f"Found {len(images_path)} inputs.")
 
+
+	sampler = DDIMSampler(model)
+
 	model.register_schedule(given_betas=None, beta_schedule="linear", timesteps=1000,
 						  linear_start=0.00085, linear_end=0.0120, cosine_s=8e-3)
 	model.num_timesteps = 1000
-
-	sqrt_alphas_cumprod = copy.deepcopy(model.sqrt_alphas_cumprod)
-	sqrt_one_minus_alphas_cumprod = copy.deepcopy(model.sqrt_one_minus_alphas_cumprod)
-
-	use_timesteps = set(space_timesteps(1000, [opt.ddpm_steps]))
-	last_alpha_cumprod = 1.0
-	new_betas = []
-	timestep_map = []
-	for i, alpha_cumprod in enumerate(model.alphas_cumprod):
-		if i in use_timesteps:
-			new_betas.append(1 - alpha_cumprod / last_alpha_cumprod)
-			last_alpha_cumprod = alpha_cumprod
-			timestep_map.append(i)
-	new_betas = [beta.data.cpu().numpy() for beta in new_betas]
-	model.register_schedule(given_betas=np.array(new_betas), timesteps=len(new_betas))
-	model.num_timesteps = 1000
-	model.ori_timesteps = list(use_timesteps)
-	model.ori_timesteps.sort()
 	model = model.to(device)
 
-	if opt.plms:
-		raise NotImplementedError("PLMS sampler not (yet) supported")
-		sampler = PLMSSampler(model)
-	else:
-		sampler = DDIMSampler(model)
+	ddim_timesteps = set(space_timesteps(1000, [opt.ddpm_steps]))
+	ddim_timesteps = list(ddim_timesteps)
+	ddim_timesteps.sort()
 
 	sampler.make_schedule(ddim_num_steps=opt.ddpm_steps, ddim_eta=opt.ddim_eta, verbose=False)
+
 
 	precision_scope = autocast if opt.precision == "autocast" else nullcontext
 	niqe_list = []
@@ -390,7 +374,12 @@ def main():
 								# If you would like to start from the intermediate steps, you can add noise to LR to the specific steps.
 								t = repeat(torch.tensor([999]), '1 -> b', b=im_lq_bs.size(0))
 								t = t.to(device).long()
-								x_T = model.q_sample_respace(x_start=init_latent, t=t, sqrt_alphas_cumprod=sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod=sqrt_one_minus_alphas_cumprod, noise=noise)
+
+								x_T = model.q_sample(x_start=init_latent, t=t, noise=noise)
+								
+
+								# x_T = model.q_sample_respace(x_start=init_latent, t=t, sqrt_alphas_cumprod=sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod=sqrt_one_minus_alphas_cumprod, noise=noise)
+								
 								# x_T = noise
 								# samples, _ = model.sample_canvas(cond=semantic_c, struct_cond=init_latent, batch_size=im_lq_pch.size(0), timesteps=opt.ddpm_steps, time_replace=opt.ddpm_steps, x_T=x_T, return_intermediates=True, tile_size=int(opt.input_size/8), tile_overlap=opt.tile_overlap, batch_size_sample=opt.n_samples)
 								# x_samples = model.decode_first_stage(samples)
@@ -433,8 +422,11 @@ def main():
 
 							
 							# samples, _ = model.sample_canvas(cond=semantic_c, struct_cond=init_latent, batch_size=im_lq_bs.size(0), timesteps=opt.ddpm_steps, time_replace=opt.ddpm_steps, x_T=x_T, return_intermediates=True, tile_size=int(opt.input_size/8), tile_overlap=opt.tile_overlap, batch_size_sample=opt.n_samples)
+							
 							# _, enc_fea_lq = vq_model.encode(im_lq_bs)
 							# x_samples = vq_model.decode(samples * 1. / model.scale_factor, enc_fea_lq)
+
+							# x_samples = vq_model.decode(enc_fea_lq, enc_fea_lq)
 
 							x_samples = model.decode_first_stage(samples)
 

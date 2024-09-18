@@ -13,7 +13,7 @@ model:
     image_size: 512
     channels: 4
     concat_mode: True
-    ckpt_path: D:/Vinh/3.Project_working/git_tutorial/StableSR/checkpoints/v2-1_512-ema-pruned.ckpt
+    # ckpt_path: D:/Vinh/3.Project_working/git_tutorial/StableSR/checkpoints/v2-1_512-ema-pruned.ckpt
     cond_stage_trainable: false
     use_usm: True
     ignore_keys: ['jpeger']
@@ -21,7 +21,11 @@ model:
     unfrozen_diff: false
     scale_factor: 0.18215
     use_ema: False
-    finetune_aue: False
+
+    finetune_aue: false
+    frozen_unet: True
+
+    finetune_dec_unet: false
     # in_channels: 8
     # out_channels: 4
 
@@ -50,7 +54,7 @@ model:
       target: ldm.models.autoencoder.AutoencoderKL
       params:
         # for training only
-        ckpt_path: D:/Vinh/3.Project_working/git_tutorial/StableSR/checkpoints/v2-1_512-ema-pruned.ckpt
+        # ckpt_path: D:/Vinh/3.Project_working/git_tutorial/StableSR/checkpoints/v2-1_512-ema-pruned.ckpt
         embed_dim: 4
         # monitor: val/rec_loss
         ddconfig:
