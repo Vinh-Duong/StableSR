@@ -524,22 +524,7 @@ class DDPM(pl.LightningModule):
         loss, loss_dict = self(x)
         return loss, loss_dict
 
-    def training_step(self, batch, batch_idx, optimizer_idx):
-        loss, loss_dict = self.shared_step(batch)
-
-        self.log_dict(loss_dict, prog_bar=True,
-                      logger=True, on_step=True, on_epoch=True)
-
-        self.log("global_step", self.global_step,
-                 prog_bar=True, logger=True, on_step=True, on_epoch=False)
-
-        if self.use_scheduler:
-            lr = self.optimizers().param_groups[0]['lr']
-            self.log('lr_abs', lr, prog_bar=True, logger=True, on_step=True, on_epoch=False)
-
-        return loss
-    
-    # def training_step(self, batch, batch_idx):
+    # def training_step(self, batch, batch_idx, optimizer_idx):
     #     loss, loss_dict = self.shared_step(batch)
 
     #     self.log_dict(loss_dict, prog_bar=True,
@@ -553,6 +538,21 @@ class DDPM(pl.LightningModule):
     #         self.log('lr_abs', lr, prog_bar=True, logger=True, on_step=True, on_epoch=False)
 
     #     return loss
+    
+    def training_step(self, batch, batch_idx):
+        loss, loss_dict = self.shared_step(batch)
+
+        self.log_dict(loss_dict, prog_bar=True,
+                      logger=True, on_step=True, on_epoch=True)
+
+        self.log("global_step", self.global_step,
+                 prog_bar=True, logger=True, on_step=True, on_epoch=False)
+
+        if self.use_scheduler:
+            lr = self.optimizers().param_groups[0]['lr']
+            self.log('lr_abs', lr, prog_bar=True, logger=True, on_step=True, on_epoch=False)
+
+        return loss
 
     @torch.no_grad()
     def validation_step(self, batch, batch_idx):
@@ -2798,6 +2798,7 @@ class LatentDiffusionStableSR(DDPM):
                  frozen_unet = False,
                  finetune_dec_unet = False,
                  time_replace = None,
+                 load_pretrain_aue = None,
                  *args, **kwargs):
         self.num_timesteps_cond = default(num_timesteps_cond, 1)
         self.scale_by_std = scale_by_std
@@ -2808,6 +2809,8 @@ class LatentDiffusionStableSR(DDPM):
         self.frozen_unet = frozen_unet
         self.finetune_dec_unet = finetune_dec_unet
         self.time_replace = time_replace
+
+        self.load_pretrain_aue = load_pretrain_aue
 
 
         assert self.num_timesteps_cond <= kwargs['timesteps']
@@ -2841,6 +2844,7 @@ class LatentDiffusionStableSR(DDPM):
 
         
 
+
         self.restarted_from_ckpt = False
         # ignore_keys = ['betas',
         #                'alphas_cumprod',
@@ -2864,7 +2868,17 @@ class LatentDiffusionStableSR(DDPM):
                     #     print(name)
                     #     param.requires_grad = True
                    
-    
+        if self.load_pretrain_aue:
+            ckpt_path_aue = first_stage_config.params.ckpt_path
+            if ckpt_path_aue is not None:
+                print(f"Loading model from {ckpt_path_aue}")
+                pl_sd = torch.load(ckpt_path_aue, map_location="cpu")
+                if "global_step" in pl_sd:
+                    print(f"Global Step: {pl_sd['global_step']}")
+                sd = pl_sd["state_dict"]
+
+                missing, unexpected = self.first_stage_model.load_state_dict(sd, strict=False)
+                
         if not self.frozen_unet:
             self.model.eval()
             # self.model.train = disabled_train
@@ -5940,6 +5954,8 @@ class LatentDiffusionSRTextWTDistill(DDPM):
                  unet_config_teacher = None,
                  load_pretrained_une_student = False,
                  ckpt_unet_student = None,
+                 load_first_stage_pretrained = True,
+                 teacher_unet_ckpt = None,
                  *args, **kwargs):
         # put this in your init
         self.num_timesteps_cond = default(num_timesteps_cond, 1)
@@ -5953,6 +5969,8 @@ class LatentDiffusionSRTextWTDistill(DDPM):
 
         self.distill_unet = distill_unet
         self.load_pretrained_une_student = load_pretrained_une_student
+        self.load_first_stage_pretrained = load_first_stage_pretrained
+        self.teacher_unet_ckpt = teacher_unet_ckpt
         
         assert self.num_timesteps_cond <= kwargs['timesteps']
         # for backwards compatibility after implementation of DiffusionWrapper
@@ -5992,15 +6010,15 @@ class LatentDiffusionSRTextWTDistill(DDPM):
 
         self.ckpt_unet_student = ckpt_unet_student
 
-        # if self.load_pretrained_une_student:
-        #     print(f"Loading pretrained_une_student from {ckpt_path}")
-        #     pl_sd = torch.load(ckpt_path, map_location="cpu")
-        #     if "global_step" in pl_sd:
-        #         print(f"Global Step: {pl_sd['global_step']}")
-        #     sd = pl_sd["state_dict"]
-        #     missing, unexpected = self.model.load_state_dict(sd, strict=False)
+        if self.load_pretrained_une_student:
+            print(f"Loading pretrained_une_student from {ckpt_path}")
+            pl_sd = torch.load(ckpt_path, map_location="cpu")
+            if "global_step" in pl_sd:
+                print(f"Global Step: {pl_sd['global_step']}")
+            sd = pl_sd["state_dict"]
+            missing, unexpected = self.model.load_state_dict(sd, strict=False)
 
-        if not self.load_pretrained_une_student:
+        if self.load_first_stage_pretrained:
             if ckpt_path is not None:
                 print(f"Loading model from {ckpt_path}")
                 pl_sd = torch.load(ckpt_path, map_location="cpu")
@@ -6011,41 +6029,65 @@ class LatentDiffusionSRTextWTDistill(DDPM):
                 missing, unexpected = self.first_stage_model.load_state_dict(sd, strict=False)
                 missing, unexpected = self.cond_stage_model.load_state_dict(sd, strict=False) 
                 missing, unexpected = self.structcond_stage_model.load_state_dict(sd, strict=False)  
-        else:
-            self.restarted_from_ckpt = False
-            if ckpt_path is not None:
-                self.init_from_ckpt(ckpt_path, ignore_keys)
-                self.restarted_from_ckpt = True
+
+
+
+        # if not self.load_pretrained_une_student:
+        #     if ckpt_path is not None:
+        #         print(f"Loading model from {ckpt_path}")
+        #         pl_sd = torch.load(ckpt_path, map_location="cpu")
+        #         if "global_step" in pl_sd:
+        #             print(f"Global Step: {pl_sd['global_step']}")
+        #         sd = pl_sd["state_dict"]
+
+        #         missing, unexpected = self.first_stage_model.load_state_dict(sd, strict=False)
+        #         missing, unexpected = self.cond_stage_model.load_state_dict(sd, strict=False) 
+        #         missing, unexpected = self.structcond_stage_model.load_state_dict(sd, strict=False)  
+        # else:
+        #     self.restarted_from_ckpt = False
+        #     if ckpt_path is not None:
+        #         self.init_from_ckpt(ckpt_path, ignore_keys)
+        #         self.restarted_from_ckpt = True
 
         if self.distill_unet:
             for name, param in self.model.named_parameters():
                     param.requires_grad = True
 
     
-        print('>>>>>>>>>>>>>>>>model student >>>>>>>>>>>>>>>>>>>>')
-        param_list = []
-        for name, params in self.model.named_parameters():
-            if params.requires_grad:
-                param_list.append(name)
-        print(param_list)
+        # print('>>>>>>>>>>>>>>>>model student >>>>>>>>>>>>>>>>>>>>')
+        # param_list = []
+        # for name, params in self.model.named_parameters():
+        #     if params.requires_grad:
+        #         param_list.append(name)
+        # print(param_list)
 
         
         if self.distill_unet:
-            self.teacher_unet_ckpt = unet_config_teacher.ckpt_path
+            # self.teacher_unet_ckpt = unet_config_teacher.ckpt_path
 
+            print(self.teacher_unet_ckpt)
             self.model_teacher = DiffusionWrapper(unet_config_teacher, conditioning_key)
 
-            print(f"Loading model from {self.teacher_unet_ckpt}")
-            pl_sd = torch.load(self.teacher_unet_ckpt, map_location="cpu")
-            if "global_step" in pl_sd:
-                print(f"Global Step: {pl_sd['global_step']}")
-            sd = pl_sd["state_dict"]
+            sd = torch.load(self.teacher_unet_ckpt, map_location="cpu")
 
-            m, u = self.model_teacher.load_state_dict(sd, strict=False)
-            self.model_teacher.cuda()
 
-            for name, param in self.model_teacher.named_parameters():
-                    param.requires_grad = False
+
+            ignore_keys = {'first_stage_model', 'cond_stage_model', 'structcond_stage_model' }
+
+            sd = sd["state_dict"]
+            keys = list(sd.keys())
+            for k in keys:
+                for ik in ignore_keys:
+                    if k.startswith(ik):
+                        # print("Deleting key {} from state_dict.".format(k))
+                        del sd[k]
+
+            sd_teacher = {}
+            for name, param in sd.items():
+                k =  name[6:]
+                sd_teacher[k] = param
+            
+            m, u = self.model_teacher.load_state_dict(sd_teacher, strict=False)
 
             print('>>>>>>>>>>>>>>>>model_teacher>>>>>>>>>>>>>>>>>>>>')
             param_list = []
@@ -6053,6 +6095,9 @@ class LatentDiffusionSRTextWTDistill(DDPM):
                 if params.requires_grad:
                     param_list.append(name)
             print(param_list)
+
+            for name, param in self.model_teacher.named_parameters():
+                param.requires_grad = False
 
 
         
@@ -6977,18 +7022,19 @@ class LatentDiffusionSRTextWTDistill(DDPM):
 
 
         if self.distill_unet:
-            model_output_teacher = self.apply_model(x_noisy,
-                                         t_ori, 
-                                         cond, # condi text???
-                                         struct_cond, # time encoder-aware
-                                         model= self.model_teacher
-                                        )
-            
-            x_rec_teacher = self.predict_start_from_noise(x_noisy, t, model_output_teacher)
-            
-            print('model_output_teacher')
-            print(model_output_teacher.shape)
-            print(model_output_teacher[0:1:,0:1,:,:])
+            with torch.no_grad():
+                model_output_teacher = self.apply_model(x_noisy,
+                                            t_ori, 
+                                            cond, # condi text???
+                                            struct_cond, # time encoder-aware
+                                            model= self.model_teacher
+                                            )
+                
+                x_rec_teacher = self.predict_start_from_noise(x_noisy, t, model_output_teacher)
+                
+                # print('model_output_teacher')
+                # print(model_output_teacher.shape)
+                # print(model_output_teacher[0:1:,0:1,:,:])
 
             model_output = self.apply_model(x_noisy,
                                             t, 
@@ -6996,11 +7042,11 @@ class LatentDiffusionSRTextWTDistill(DDPM):
                                             struct_cond # time encoder-aware
                                             )
             
-            x_rec_student = self.predict_start_from_noise(x_noisy, t, model_output)
+            # x_rec_student = self.predict_start_from_noise(x_noisy, t, model_output)
             
-            print('model_output')
-            print(model_output.shape)
-            print(model_output[0:1:,0:1,:,:])
+            # print('model_output')
+            # print(model_output.shape)
+            # print(model_output[0:1:,0:1,:,:])
 
         else:
             model_output = self.apply_model(x_noisy,
@@ -7013,7 +7059,7 @@ class LatentDiffusionSRTextWTDistill(DDPM):
         prefix = 'train' if self.training else 'val'
 
         if self.distill_unet:
-            target = model_output_teacher
+            target = x_rec_teacher
         else:
             if self.parameterization == "x0":
                 target = x_start

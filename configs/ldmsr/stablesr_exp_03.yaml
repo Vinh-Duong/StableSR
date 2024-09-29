@@ -13,7 +13,7 @@ model:
     image_size: 512
     channels: 4
     concat_mode: True
-    # ckpt_path: D:/Vinh/3.Project_working/git_tutorial/StableSR/checkpoints/v2-1_512-ema-pruned.ckpt
+    ckpt_path: D:/Vinh/3.Project_working/git_tutorial/StableSR/checkpoints/v2-1_512-ema-pruned.ckpt
     # ckpt_path: D:/Vinh/3.Project_working/git_tutorial/StableSR/logs/2024-09-16T19-16-30_stablesr_exp_03/checkpoints/last.ckpt
     cond_stage_trainable: false
     use_usm: True
@@ -23,10 +23,11 @@ model:
     scale_factor: 0.18215
     use_ema: False
 
-    finetune_aue: True
+    finetune_aue: False
+    load_pretrain_aue: False
 
-    frozen_unet: True
-    finetune_dec_unet: false
+    frozen_unet: False
+    finetune_dec_unet: False
     # in_channels: 8
     # out_channels: 4
 
@@ -56,7 +57,7 @@ model:
       params:
         # for training only
         # ckpt_path: D:/Vinh/3.Project_working/git_tutorial/StableSR/checkpoints/v2-1_512-ema-pruned.ckpt
-        # ckpt_path: D:/Vinh/3.Project_working/git_tutorial/StableSR/logs/2024-09-16T19-16-30_stablesr_exp_03/checkpoints/last.ckpt
+        ckpt_path: D:/Vinh/3.Project_working/git_tutorial/StableSR/logs/2024-09-18T19-50-36_train_aue/checkpoints/last.ckpt
         embed_dim: 4
         # monitor: val/rec_loss
         ddconfig:

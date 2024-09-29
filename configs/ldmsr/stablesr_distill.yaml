@@ -3,7 +3,7 @@ model:
   base_learning_rate: 5.0e-05
   target: ldm.models.diffusion.ddpm.LatentDiffusionSRTextWTDistill
   params:
-    # parameterization: "v"
+    parameterization: "v"
     linear_start: 0.00085
     linear_end: 0.0120
     num_timesteps_cond: 1
@@ -19,7 +19,7 @@ model:
     scale_factor: 0.18215
     use_ema: False
     # for training only
-    ckpt_path: D:/Vinh/3.Project_working/git_tutorial/StableSR/checkpoints/stablesr_turbo.ckpt
+    ckpt_path: D:/Vinh/3.Project_working/git_tutorial/StableSR/checkpoints/stablesr_000117.ckpt
     unfrozen_diff: False
     random_size: False
     time_replace: 1000
@@ -28,51 +28,57 @@ model:
     p2_gamma: ~
     p2_k: ~
     # ignore_keys: []
-    distill_unet: True
-    load_pretrained_une_student: True
-    # ckpt_unet_student: ./checkpoints/ldmsr4x_finetune_119.ckpt
-
-    # unet_config:
-    #   target: ldm.modules.diffusionmodules.openaimodel.UNetModel
-    #   params:
-    #     image_size: 128
-    #     in_channels: 6
-    #     out_channels: 3
-    #     model_channels: 160
-    #     attention_resolutions:
-    #     - 16
-    #     - 8
-    #     num_res_blocks: 2
-    #     channel_mult:
-    #     - 1
-    #     - 2
-    #     - 2
-    #     - 4
-    #     num_head_channels: 32
+    distill_unet: False
+    load_pretrained_une_student: False
+    load_first_stage_pretrained: true
+    
+    ckpt_unet_student: ./checkpoints/ldmsr4x_finetune_119.ckpt
+    teacher_unet_ckpt: D:/Vinh/3.Project_working/git_tutorial/StableSR/checkpoints/stablesr_000117.ckpt
 
     unet_config:
-      target: ldm.modules.diffusionmodules.openaimodel.UNetModelDualcondV2
+      target: ldm.modules.diffusionmodules.openaimodel.UNetModel
       params:
-        image_size: 32 # unused
+        image_size: 128
         in_channels: 4
         out_channels: 4
-        model_channels: 320
+        model_channels: 160
         attention_resolutions: [ 4, 2, 1 ]
+        # - 16
+        # - 8
         num_res_blocks: 2
-        channel_mult: [ 1, 2, 4, 4 ]
-        num_head_channels: 64
+        channel_mult:
+        - 1
+        - 2
+        - 2
+        - 4
+        num_head_channels: 32
         use_spatial_transformer: True
-        use_linear_in_transformer: True
+        use_linear_in_transformer: False
         transformer_depth: 1
         context_dim: 1024
-        use_checkpoint: False
-        legacy: False
-        semb_channels: 256
+
+    # unet_config:
+    #   target: ldm.modules.diffusionmodules.openaimodel.UNetModelDualcondV2
+    #   params:
+    #     image_size: 32 # unused
+    #     in_channels: 4
+    #     out_channels: 4
+    #     model_channels: 160
+    #     attention_resolutions: [ 4, 2, 1 ]
+    #     num_res_blocks: 2
+    #     channel_mult: [ 1, 2, 4, 4 ]
+    #     num_head_channels: 64
+    #     use_spatial_transformer: True
+    #     use_linear_in_transformer: True
+    #     transformer_depth: 1
+    #     context_dim: 1024
+    #     use_checkpoint: False
+    #     legacy: False
+    #     semb_channels: 256
         # semb_channels: 256
 
     unet_config_teacher:
       target: ldm.modules.diffusionmodules.openaimodel.UNetModelDualcondV2
-      ckpt_path: D:/Vinh/3.Project_working/git_tutorial/StableSR/checkpoints/stablesr_turbo.ckpt
       params:
         image_size: 32 # unused
         in_channels: 4
@@ -92,7 +98,6 @@ model:
 
     first_stage_config:
       target: ldm.models.autoencoder.AutoencoderKL
-      ckpt_path: D:/Vinh/3.Project_working/git_tutorial/StableSR/checkpoints/stablesr_turbo.ckpt
       params:
         # for training only
         embed_dim: 4
@@ -117,14 +122,12 @@ model:
 
     cond_stage_config:
       target: ldm.modules.encoders.modules.FrozenOpenCLIPEmbedder
-      ckpt_path: D:/Vinh/3.Project_working/git_tutorial/StableSR/checkpoints/stablesr_turbo.ckpt
       params:
         freeze: True
         layer: "penultimate"
 
     structcond_stage_config:
       target: ldm.modules.diffusionmodules.openaimodel.EncoderUNetModelWT
-      ckpt_path: D:/Vinh/3.Project_working/git_tutorial/StableSR/checkpoints/stablesr_turbo.ckpt
       params:
         image_size: 96
         in_channels: 4
@@ -283,7 +286,7 @@ lightning:
     image_logger:
       target: main.ImageLogger
       params:
-        batch_frequency: 1500
+        batch_frequency: 150000
         max_images: 4
         increase_log_steps: False
 
