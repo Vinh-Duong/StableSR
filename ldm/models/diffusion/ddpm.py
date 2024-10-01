@@ -5994,14 +5994,14 @@ class LatentDiffusionSRTextWTDistill(DDPM):
             self.register_buffer('scale_factor', torch.tensor(scale_factor))
         # self.instantiate_first_stage(first_stage_config)
 
-        # self.first_stage_config_ckpt = first_stage_config.params.ckpt_path
-        # self.cond_stage_config_ckpt = unet_config_teacher.params.ckpt_path
-        # self.teacher_ckpt = unet_config_teacher.params.ckpt_path
-        # self.teacher_ckpt = unet_config_teacher.params.ckpt_path
+        self.first_stage_config_ckpt = first_stage_config.ckpt_path
+        self.cond_stage_config_ckpt = cond_stage_config.ckpt_path
+        self.structcond_stage_config_ckpt = structcond_stage_config.ckpt_path
 
-        self.instantiate_first_stage(first_stage_config)
-        self.instantiate_cond_stage(cond_stage_config)
-        self.instantiate_structcond_stage(structcond_stage_config)
+
+        self.instantiate_first_stage(first_stage_config, self.first_stage_config_ckpt)
+        self.instantiate_cond_stage(cond_stage_config,self.cond_stage_config_ckpt)
+        self.instantiate_structcond_stage(structcond_stage_config, self.cond_stage_config_ckpt)
 
 
         self.cond_stage_forward = cond_stage_forward
@@ -6010,25 +6010,31 @@ class LatentDiffusionSRTextWTDistill(DDPM):
 
         self.ckpt_unet_student = ckpt_unet_student
 
-        if self.load_pretrained_une_student:
-            print(f"Loading pretrained_une_student from {ckpt_path}")
-            pl_sd = torch.load(ckpt_path, map_location="cpu")
-            if "global_step" in pl_sd:
-                print(f"Global Step: {pl_sd['global_step']}")
-            sd = pl_sd["state_dict"]
-            missing, unexpected = self.model.load_state_dict(sd, strict=False)
+        # if self.load_pretrained_une_student:
+        #     print(f"Loading pretrained_une_student from {ckpt_path}")
+        #     pl_sd = torch.load(ckpt_path, map_location="cpu")
+        #     if "global_step" in pl_sd:
+        #         print(f"Global Step: {pl_sd['global_step']}")
+        #     sd = pl_sd["state_dict"]
+        #     missing, unexpected = self.model.load_state_dict(sd, strict=False)
 
-        if self.load_first_stage_pretrained:
-            if ckpt_path is not None:
-                print(f"Loading model from {ckpt_path}")
-                pl_sd = torch.load(ckpt_path, map_location="cpu")
-                if "global_step" in pl_sd:
-                    print(f"Global Step: {pl_sd['global_step']}")
-                sd = pl_sd["state_dict"]
+        # if self.load_first_stage_pretrained:
+        #     if ckpt_path is not None:
+        #         print(f"Loading model from {ckpt_path}")
+        #         pl_sd = torch.load(ckpt_path, map_location="cpu")
+        #         if "global_step" in pl_sd:
+        #             print(f"Global Step: {pl_sd['global_step']}")
+        #         sd = pl_sd["state_dict"]
 
-                missing, unexpected = self.first_stage_model.load_state_dict(sd, strict=False)
-                missing, unexpected = self.cond_stage_model.load_state_dict(sd, strict=False) 
-                missing, unexpected = self.structcond_stage_model.load_state_dict(sd, strict=False)  
+        #         for name, param in sd.items():
+        #             if name.startswith('first_stage_model'):
+        #                 print(name)
+
+        #         missing, unexpected = self.first_stage_model.load_state_dict(sd, strict=False)
+        #         missing, unexpected = self.cond_stage_model.load_state_dict(sd, strict=False) 
+        #         missing, unexpected = self.structcond_stage_model.load_state_dict(sd, strict=False)  
+
+
 
 
 
@@ -6049,17 +6055,17 @@ class LatentDiffusionSRTextWTDistill(DDPM):
         #         self.init_from_ckpt(ckpt_path, ignore_keys)
         #         self.restarted_from_ckpt = True
 
-        if self.distill_unet:
-            for name, param in self.model.named_parameters():
-                    param.requires_grad = True
+        
+        for name, param in self.model.named_parameters():
+                param.requires_grad = True
 
     
-        # print('>>>>>>>>>>>>>>>>model student >>>>>>>>>>>>>>>>>>>>')
-        # param_list = []
-        # for name, params in self.model.named_parameters():
-        #     if params.requires_grad:
-        #         param_list.append(name)
-        # print(param_list)
+        print('>>>>>>>>>>>>>>>>model student >>>>>>>>>>>>>>>>>>>>')
+        param_list = []
+        for name, params in self.model.named_parameters():
+            if params.requires_grad:
+                param_list.append(name)
+        print(param_list)
 
         
         if self.distill_unet:
@@ -6069,8 +6075,6 @@ class LatentDiffusionSRTextWTDistill(DDPM):
             self.model_teacher = DiffusionWrapper(unet_config_teacher, conditioning_key)
 
             sd = torch.load(self.teacher_unet_ckpt, map_location="cpu")
-
-
 
             ignore_keys = {'first_stage_model', 'cond_stage_model', 'structcond_stage_model' }
 
@@ -6201,14 +6205,23 @@ class LatentDiffusionSRTextWTDistill(DDPM):
 
     def instantiate_first_stage(self, config, ckpt = None):
         model = instantiate_from_config(config)
-
         if ckpt is not None:
             print(f"Loading model from {ckpt}")
             pl_sd = torch.load(ckpt, map_location="cpu")
             if "global_step" in pl_sd:
                 print(f"Global Step: {pl_sd['global_step']}")
             sd = pl_sd["state_dict"]
-            m, u = model.load_state_dict(sd, strict=False)
+
+            sd_new = {}
+            # ignore_keys = {'first_stage_model', 'cond_stage_model', 'structcond_stage_model' }
+            for name, param in sd.items():
+                if name.startswith('first_stage_model.'):
+                    print(name)
+                    k =  name[18:]
+                    print(k)
+                    sd_new[k] = param
+            m, u = model.load_state_dict(sd_new, strict=False)
+
 
         self.first_stage_model = model.eval()
         self.first_stage_model.train = disabled_train
@@ -6238,32 +6251,44 @@ class LatentDiffusionSRTextWTDistill(DDPM):
             self.cond_stage_model = model
             self.cond_stage_model.train()
 
-        
         if ckpt is not None:
-            print(f"Loading cond_stage_model from {ckpt}")
+            print(f"Loading model from {ckpt}")
             pl_sd = torch.load(ckpt, map_location="cpu")
             if "global_step" in pl_sd:
                 print(f"Global Step: {pl_sd['global_step']}")
             sd = pl_sd["state_dict"]
-            m, u = self.cond_stage_model.load_state_dict(sd, strict=False)
 
-        if self.distill_unet:
-            self.cond_stage_model.train = disabled_train
-            for param in self.cond_stage_model.parameters():
-                param.requires_grad = False
+            sd_new = {}
+            # ignore_keys = {'first_stage_model', 'cond_stage_model', 'structcond_stage_model' }
+            for name, param in sd.items():
+                if name.startswith('cond_stage_model.'):
+                    print(name)
+                    k =  name[18:]
+                    print(k)
+                    sd_new[k] = param
+            m, u = self.cond_stage_model.load_state_dict(sd_new, strict=False)
             
 
     def instantiate_structcond_stage(self, config, ckpt = None):
         model = instantiate_from_config(config)
         
-
         if ckpt is not None:
-            print(f"Loading structcond_stage_model from {ckpt}")
+            print(f"Loading model from {ckpt}")
             pl_sd = torch.load(ckpt, map_location="cpu")
             if "global_step" in pl_sd:
                 print(f"Global Step: {pl_sd['global_step']}")
             sd = pl_sd["state_dict"]
-            m, u = model.load_state_dict(sd, strict=False)
+
+            sd_new = {}
+            # ignore_keys = {'first_stage_model', 'cond_stage_model', 'structcond_stage_model' }
+            for name, param in sd.items():
+                if name.startswith('structcond_stage_model.'):
+                    print(name)
+                    k =  name[23:]
+                    print(k)
+                    sd_new[k] = param
+            m, u = model.load_state_dict(sd_new, strict=False)
+
 
         self.structcond_stage_model = model.eval()
         self.structcond_stage_model.train = disabled_train

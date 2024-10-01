@@ -69,11 +69,11 @@
 
 python scripts/sr_val_stable_sr_neg_promt.py \
 --config configs/ldmsr/stablesr_distill.yaml \
---ckpt D:/Vinh/3.Project_working/git_tutorial/StableSR/logs/2024-09-28T20-49-56_stablesr_distill/checkpoints/last.ckpt \
+--ckpt ./logs/2024-09-29T16-20-59_stablesr_distill_sunet_scratch/checkpoints/epoch=000034.ckpt \
 --vqgan_ckpt D:/Vinh/3.Project_working/git_tutorial/StableSR/checkpoints/vqgan_cfw_00011.ckpt \
 --init-img D:/Vinh/3.Project_working/diffusion/dataset/test_data/DIV2K_valid_100_750x1000_center_crop_x4 \
---outdir ./outputs/stablesr_distill_1steps \
---ddpm_steps 1 \
+--outdir ./outputs/stablesr_distill_sunet_scratch_24 \
+--ddpm_steps 200 \
 --dec_w 0.0 \
 --colorfix_type wavelet
 
