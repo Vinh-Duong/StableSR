@@ -325,6 +325,13 @@ class DDPM(pl.LightningModule):
         #             print("Deleting key {} from state_dict.".format(ik))
         #             del sd[ik]
 
+        print('<<<<<<<<<<<< BEFORE >>>>>>>>>>>>>>>')
+        for name, param in sd.items():
+            # print(name)
+            if 'model.diffusion_model.input_blocks.0.0.weight' in name:
+                print(name)
+                print(param)
+
         if sd['model.diffusion_model.input_blocks.0.0.weight'].shape[1] != self.in_channels:
 
             for name, param in sd.items():
@@ -352,18 +359,40 @@ class DDPM(pl.LightningModule):
 
                     # print(sd[name].shape)
 
+        sd_new = {}
+        for name, param in sd.items():
+            if name.startswith('first_stage_model.'):
+                print(name)
+                k =  name[18:]
+                sd_new[k] = param
+            if name.startswith('cond_stage_model.'):
+                print(name)
+                k =  name[18:]
+                sd_new[k] = param
+            if name.startswith('model.'):
+                print(name)
+                k =  name[6:]
+                sd_new[k] = param
+
+        missing, unexpected = self.load_state_dict(sd_new, strict=False) if not only_model else self.model.load_state_dict(
+            sd_new, strict=False)
+        
+        print('<<<<<<<<<<<< After >>>>>>>>>>>>>>>')
+        for name, param in self.model.named_parameters():
+            # print(name)
+            if 'diffusion_model.input_blocks.0.0.weight' in name:
+                print(name)
+                print(param)
+        
 
 
-        missing, unexpected = self.load_state_dict(sd, strict=False) if not only_model else self.model.load_state_dict(
-            sd, strict=False)
 
-
-        print('<<<<<<<<<<<<>>>>>>>>>>>>>>>')
-        print(f"Restored from {path} with {len(missing)} missing and {len(unexpected)} unexpected keys")
-        if len(missing) > 0:
-            print(f"Missing Keys: {missing}")
-        if len(unexpected) > 0:
-            print(f"Unexpected Keys: {unexpected}")
+        # print('<<<<<<<<<<<<>>>>>>>>>>>>>>>')
+        # print(f"Restored from {path} with {len(missing)} missing and {len(unexpected)} unexpected keys")
+        # if len(missing) > 0:
+        #     print(f"Missing Keys: {missing}")
+        # if len(unexpected) > 0:
+        #     print(f"Unexpected Keys: {unexpected}")
 
     def q_mean_variance(self, x_start, t):
         """
@@ -2907,12 +2936,12 @@ class LatentDiffusionStableSR(DDPM):
                             print(name)
                             param.requires_grad = True
 
-        print('>>>>>>>>>>>>>>>>model>>>>>>>>>>>>>>>>>>>>')
-        param_list = []
-        for name, params in self.model.named_parameters():
-            if params.requires_grad:
-                param_list.append(name)
-        print(param_list)
+        # print('>>>>>>>>>>>>>>>>model>>>>>>>>>>>>>>>>>>>>')
+        # param_list = []
+        # for name, params in self.model.named_parameters():
+        #     if params.requires_grad:
+        #         param_list.append(name)
+        # print(param_list)
 
 
         # Support time respacing during training
