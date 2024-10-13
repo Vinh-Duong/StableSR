@@ -406,7 +406,15 @@ def main():
 						im_spliter = ImageSpliterTh(im_lq_bs, opt.vqgantile_size, opt.vqgantile_stride, sf=1)
 						for im_lq_pch, index_infos in im_spliter:
 							seed_everything(opt.seed)
+
+							b, c, w, h = im_lq_pch.shape
+							print(f"input size before encode is ({w}, {h})")
+							
 							init_latent = model.get_first_stage_encoding(model.encode_first_stage(im_lq_pch))  # move to latent space
+
+							b, c, w, h = init_latent.shape
+							print(f"latent size is ({w}, {h})")
+							
 							if opt.use_posi_prompt:
 								# text_init = ['(masterpiece:2), (best quality:2), (realistic:2), (very clear:2)']*im_lq_pch.size(0)
 								text_init = ['Good photo.']*im_lq_pch.size(0)
@@ -446,7 +454,15 @@ def main():
 						im_sr = im_spliter.gather()
 						im_sr = torch.clamp((im_sr+1.0)/2.0, min=0.0, max=1.0)
 					else:
+
+						b, c, w, h = im_lq_bs.shape
+						print(f"input size is ({w}, {h})")
+						
 						init_latent = model.get_first_stage_encoding(model.encode_first_stage(im_lq_bs))  # move to latent space
+
+						b, c, w, h = init_latent.shape
+						print(f"latent size is ({w}, {h})")
+						
 						if opt.use_posi_prompt:
 							text_init = ['(masterpiece:2), (best quality:2), (realistic:2), (very clear:2)']*im_lq_bs.size(0)
 							# text_init = ['Good photo.']*im_lq_bs.size(0)

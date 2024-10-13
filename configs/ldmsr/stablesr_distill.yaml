@@ -29,11 +29,11 @@ model:
     p2_k: ~
     # ignore_keys: []
     distill_unet: False
-    load_pretrained_une_student: False
+
+    # load_pretrained_une_student: False
     load_first_stage_pretrained: true
     
-    ckpt_unet_student: ./checkpoints/ldmsr4x_finetune_119.ckpt
-    teacher_unet_ckpt: D:/Vinh/3.Project_working/git_tutorial/StableSR/checkpoints/stablesr_000117.ckpt
+    # teacher_unet_ckpt: D:/Vinh/3.Project_working/git_tutorial/StableSR/checkpoints/stablesr_000117.ckpt
 
     unet_config:
       target: ldm.modules.diffusionmodules.openaimodel.UNetModel

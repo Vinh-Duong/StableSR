@@ -142,7 +142,7 @@ def main():
 	parser.add_argument(
 		"--ddpm_steps",
 		type=int,
-		default=1000,
+		default=20,
 		help="number of ddpm sampling steps",
 	)
 	parser.add_argument(
@@ -257,12 +257,6 @@ def main():
     )
 
 	parser.add_argument(
-		"--strength",
-		type=float,
-		default=0.75,
-		help="strength for noising/unnoising. 1.0 corresponds to full destruction of information in init image",
-	)
-	parser.add_argument(
 		"--use_negative_prompt",
 		action='store_true',
 		help="if enabled, save inputs",
@@ -273,8 +267,12 @@ def main():
 		help="if enabled, save inputs",
 	)
 
-
-
+	parser.add_argument(
+		"--scale",
+		type=float,
+        default=7.0,
+		help="if enabled, save inputs",
+	)
 
 	opt = parser.parse_args()
 	seed_everything(opt.seed)
@@ -295,11 +293,6 @@ def main():
 
 	model.configs = config
 
-	vqgan_config = OmegaConf.load("configs/autoencoder/autoencoder_kl_64x64x4_resi.yaml")
-	vq_model = load_model_from_config(vqgan_config, opt.vqgan_ckpt)
-	vq_model = vq_model.to(device)
-	vq_model.decoder.fusion_w = opt.dec_w
-
 	os.makedirs(opt.outdir, exist_ok=True)
 	outpath = opt.outdir
 
@@ -315,8 +308,6 @@ def main():
 
 
 	sampler = DDIMSampler(model)
-
-	sampler.configs = config
 
 	model.register_schedule(given_betas=None, beta_schedule="linear", timesteps=1000,
 						  linear_start=0.00085, linear_end=0.0120, cosine_s=8e-3)
@@ -369,10 +360,12 @@ def main():
 						im_lq_bs = torch.cat(im_lq_bs, dim=0)
 						ori_h, ori_w = im_lq_bs.shape[2:]
 						ref_patch=None
-						if not (ori_h % 32 == 0 and ori_w % 32 == 0):
+
+						if not (ori_h % 64 == 0 and ori_w % 64 == 0):
 							flag_pad = True
-							pad_h = ((ori_h // 32) + 1) * 32 - ori_h
-							pad_w = ((ori_w // 32) + 1) * 32 - ori_w
+							pad_h = ((ori_h // 64) + 1) * 64 - ori_h
+							pad_w = ((ori_w // 64) + 1) * 64 - ori_w
+							print('padding')
 							im_lq_bs = F.pad(im_lq_bs, pad=(0, pad_w, 0, pad_h), mode='reflect')
 						else:
 							flag_pad = False
@@ -383,16 +376,17 @@ def main():
 								seed_everything(opt.seed)
 
 								b, c, w, h = im_lq_pch.shape
-								print(f"im_lq_bs size before encode is ({w}, {h})")
+								print(f"im_lq_pch size before encode is ({w}, {h})")
 
 								init_latent = model.get_first_stage_encoding(model.encode_first_stage(im_lq_pch))  # move to latent space
 
 								b, c, w, h = init_latent.shape
-								print(f"im_lq_bs size after encode is ({w}, {h})")
+								print(f"im_lq_pch size after encode is ({w}, {h})")
+					
 
 								if opt.use_posi_prompt:
-									# text_init = ['(masterpiece:2), (best quality:2), (realistic:2), (very clear:2)']*im_lq_pch.size(0)
-									text_init = ['Good photo.']*im_lq_pch.size(0)
+									text_init = ['(masterpiece:2), (best quality:2), (realistic:2), (very clear:2)']*im_lq_pch.size(0)
+									# text_init = ['Good photo.']*im_lq_pch.size(0)
 								else:
 									text_init = ['']*im_lq_pch.size(0)
 
@@ -400,34 +394,38 @@ def main():
 					
 
 								if opt.use_negative_prompt:
-									negative_text_init = ['3d, cartoon, anime, sketches, (worst quality:2), (low quality:2)']*im_lq_bs.size(0)
+									negative_text_init = ['3d, cartoon, anime, sketches, (worst quality:2), (low quality:2)']*im_lq_pch.size(0)
 									# negative_text_init = ['Bad photo.']*im_lq_bs.size(0)
 									nega_semantic_c = model.cond_stage_model(negative_text_init)
+
+								if opt.use_negative_prompt:
+									nega_semantic_c = {'c_concat': [init_latent], 'c_crossattn': [nega_semantic_c]}
+
+								cond = {'c_concat': [init_latent], 'c_crossattn': [semantic_c]}
 
 								noise = torch.randn_like(init_latent)
 								# If you would like to start from the intermediate steps, you can add noise to LR to the specific steps.
 								t = repeat(torch.tensor([999]), '1 -> b', b=im_lq_bs.size(0))
 								t = t.to(device).long()
-								x_T = model.q_sample(x_start=init_latent, t=t, noise=noise)
-								# x_T = None
-								samples, _ = sampler.ddim_sampling_sr_t_naive(cond=semantic_c,
-																# struct_cond=init_latent,
-																shape=init_latent.shape,
-																unconditional_conditioning=nega_semantic_c if opt.use_negative_prompt else None,
-																unconditional_guidance_scale=opt.scale if opt.use_negative_prompt else None,
-																timesteps=np.array(ddim_timesteps),
-																x_T=x_T,
-																tile_size=opt.input_size//8,
-																tile_overlap=opt.tile_overlap,
-																batch_size=opt.n_samples)
 
-								# samples, _ = sampler.sample(t, init_latent.size(0), (3,init_latent.size(2),init_latent.size(3)), init_latent, eta=opt.ddim_eta, verbose=False, x_T=x_T)
+								x_T = model.q_sample(x_start=init_latent, t=t, noise=noise)
+								
+
+								samples, _ = sampler.sample(opt.ddpm_steps, 
+															init_latent.size(0),
+									  						(init_latent.size(1),init_latent.size(2),init_latent.size(3)), 
+															cond, 
+															eta=opt.ddim_eta, 
+															verbose=True, 
+															x_T=x_T,
+															unconditional_conditioning=nega_semantic_c if opt.use_negative_prompt else None,
+															unconditional_guidance_scale=opt.scale if opt.use_negative_prompt else None,
+															)
+															
 
 								x_samples = model.decode_first_stage(samples)
 
-								# _, enc_fea_lq = vq_model.encode(im_lq_pch)
-
-								# x_samples = vq_model.decode(samples * 1. / model.scale_factor, init_latent)
+								
 
 								if opt.colorfix_type == 'adain':
 									x_samples = adaptive_instance_normalization(x_samples, im_lq_pch)
@@ -444,37 +442,54 @@ def main():
 
 							b, c, w, h = init_latent.shape
 							print(f"init_latent size after encode is ({w}, {h})")
+							
 
 							if opt.use_posi_prompt:
-									# text_init = ['(masterpiece:2), (best quality:2), (realistic:2), (very clear:2)']*im_lq_pch.size(0)
-									text_init = ['Good photo.']*im_lq_bs.size(0)
+								text_init = ['(masterpiece:2), (best quality:2), (realistic:2), (very clear:2)']*im_lq_bs.size(0)
+								# text_init = ['Good photo.']*im_lq_pch.size(0)
 							else:
 								text_init = ['']*im_lq_bs.size(0)
 
 							semantic_c = model.cond_stage_model(text_init)
-							
-							
+				
+
 							if opt.use_negative_prompt:
 								negative_text_init = ['3d, cartoon, anime, sketches, (worst quality:2), (low quality:2)']*im_lq_bs.size(0)
 								# negative_text_init = ['Bad photo.']*im_lq_bs.size(0)
 								nega_semantic_c = model.cond_stage_model(negative_text_init)
 
+							
 							noise = torch.randn_like(init_latent)
 							# If you would like to start from the intermediate steps, you can add noise to LR to the specific steps.
 							t = repeat(torch.tensor([999]), '1 -> b', b=im_lq_bs.size(0))
 							t = t.to(device).long()
+							# x_T = model.q_sample_respace(x_start=init_latent, t=t, sqrt_alphas_cumprod=sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod=sqrt_one_minus_alphas_cumprod, noise=noise)
 							x_T = model.q_sample(x_start=init_latent, t=t, noise=noise)
-							# x_T = None
-							samples, _ = sampler.ddim_sampling_sr_t_naive(cond=semantic_c,
-															# struct_cond=init_latent,
-															shape=init_latent.shape,
+
+
+							if opt.use_negative_prompt:
+								nega_semantic_c = {'c_concat': [init_latent], 'c_crossattn': [nega_semantic_c]}
+							
+							cond = {'c_concat': [init_latent], 'c_crossattn': [semantic_c]}
+
+							noise = torch.randn_like(init_latent)
+							# If you would like to start from the intermediate steps, you can add noise to LR to the specific steps.
+							t = repeat(torch.tensor([999]), '1 -> b', b=im_lq_bs.size(0))
+							t = t.to(device).long()
+
+							x_T = model.q_sample(x_start=init_latent, t=t, noise=noise)
+							
+
+							samples, _ = sampler.sample(opt.ddpm_steps, 
+															init_latent.size(0),
+									  						(init_latent.size(1),init_latent.size(2),init_latent.size(3)), 
+															cond, 
+															eta=opt.ddim_eta, 
+															verbose=True, 
+															x_T=x_T,
 															unconditional_conditioning=nega_semantic_c if opt.use_negative_prompt else None,
 															unconditional_guidance_scale=opt.scale if opt.use_negative_prompt else None,
-															timesteps=np.array(ddim_timesteps),
-															x_T=x_T,
-															tile_size=opt.input_size//8,
-															tile_overlap=opt.tile_overlap,
-															batch_size=opt.n_samples)
+															)
 
 							x_samples = model.decode_first_stage(samples)
 

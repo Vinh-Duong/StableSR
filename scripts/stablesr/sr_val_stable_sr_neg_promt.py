@@ -91,6 +91,14 @@ def load_model_from_config(config, ckpt, verbose=False):
 		print(f"Global Step: {pl_sd['global_step']}")
 	sd = pl_sd["state_dict"]
 	model = instantiate_from_config(config.model)
+
+	print('>>>>>>>>>>>>>>>> print model >>>>>>>>>>>>>>>>>>>>')
+	param_list = []
+	for name, params in model.named_parameters():
+		# if params.requires_grad:
+		param_list.append(name)
+	print(param_list)
+	
 	m, u = model.load_state_dict(sd, strict=False)
 	if len(m) > 0 and verbose:
 		print("missing keys:")
@@ -256,6 +264,26 @@ def main():
         help="ddim eta (eta=0.0 corresponds to deterministic sampling",
     )
 
+	parser.add_argument(
+		"--strength",
+		type=float,
+		default=0.75,
+		help="strength for noising/unnoising. 1.0 corresponds to full destruction of information in init image",
+	)
+	parser.add_argument(
+		"--use_negative_prompt",
+		action='store_true',
+		help="if enabled, save inputs",
+	)
+	parser.add_argument(
+		"--use_posi_prompt",
+		action='store_true',
+		help="if enabled, save inputs",
+	)
+
+
+
+
 	opt = parser.parse_args()
 	seed_everything(opt.seed)
 
@@ -295,6 +323,8 @@ def main():
 
 
 	sampler = DDIMSampler(model)
+
+	sampler.configs = config
 
 	model.register_schedule(given_betas=None, beta_schedule="linear", timesteps=1000,
 						  linear_start=0.00085, linear_end=0.0120, cosine_s=8e-3)
@@ -361,30 +391,45 @@ def main():
 								seed_everything(opt.seed)
 
 								b, c, w, h = im_lq_pch.shape
-								print(f"im_lq_pch size before encode is ({w}, {h})")
+								print(f"im_lq_bs size before encode is ({w}, {h})")
 
 								init_latent = model.get_first_stage_encoding(model.encode_first_stage(im_lq_pch))  # move to latent space
 
 								b, c, w, h = init_latent.shape
-								print(f"im_lq_pch size after encode is ({w}, {h})")
-					
-								text_init = ['']*opt.n_samples
+								print(f"im_lq_bs size after encode is ({w}, {h})")
+
+								if opt.use_posi_prompt:
+									# text_init = ['(masterpiece:2), (best quality:2), (realistic:2), (very clear:2)']*im_lq_pch.size(0)
+									text_init = ['Good photo.']*im_lq_pch.size(0)
+								else:
+									text_init = ['']*im_lq_pch.size(0)
+
 								semantic_c = model.cond_stage_model(text_init)
+					
+
+								if opt.use_negative_prompt:
+									negative_text_init = ['3d, cartoon, anime, sketches, (worst quality:2), (low quality:2)']*im_lq_bs.size(0)
+									# negative_text_init = ['Bad photo.']*im_lq_bs.size(0)
+									nega_semantic_c = model.cond_stage_model(negative_text_init)
+
 								noise = torch.randn_like(init_latent)
 								# If you would like to start from the intermediate steps, you can add noise to LR to the specific steps.
 								t = repeat(torch.tensor([999]), '1 -> b', b=im_lq_bs.size(0))
 								t = t.to(device).long()
-
 								x_T = model.q_sample(x_start=init_latent, t=t, noise=noise)
-								
+								# x_T = None
+								samples, _ = sampler.ddim_sampling_sr_t_naive(cond=semantic_c,
+																# struct_cond=init_latent,
+																shape=init_latent.shape,
+																unconditional_conditioning=nega_semantic_c if opt.use_negative_prompt else None,
+																unconditional_guidance_scale=opt.scale if opt.use_negative_prompt else None,
+																timesteps=np.array(ddim_timesteps),
+																x_T=x_T,
+																tile_size=opt.input_size//8,
+																tile_overlap=opt.tile_overlap,
+																batch_size=opt.n_samples)
 
-								# x_T = model.q_sample_respace(x_start=init_latent, t=t, sqrt_alphas_cumprod=sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod=sqrt_one_minus_alphas_cumprod, noise=noise)
-								
-								# x_T = noise
-								# samples, _ = model.sample_canvas(cond=semantic_c, struct_cond=init_latent, batch_size=im_lq_pch.size(0), timesteps=opt.ddpm_steps, time_replace=opt.ddpm_steps, x_T=x_T, return_intermediates=True, tile_size=int(opt.input_size/8), tile_overlap=opt.tile_overlap, batch_size_sample=opt.n_samples)
-								# x_samples = model.decode_first_stage(samples)
-
-								samples, _ = sampler.sample(t, init_latent.size(0), (3,init_latent.size(2),init_latent.size(3)), init_latent, eta=opt.ddim_eta, verbose=False, x_T=x_T)
+								# samples, _ = sampler.sample(t, init_latent.size(0), (3,init_latent.size(2),init_latent.size(3)), init_latent, eta=opt.ddim_eta, verbose=False, x_T=x_T)
 
 								x_samples = model.decode_first_stage(samples)
 
@@ -407,26 +452,37 @@ def main():
 
 							b, c, w, h = init_latent.shape
 							print(f"init_latent size after encode is ({w}, {h})")
-							
-							# init_latent = model.get_first_stage_encoding(model.encode_first_stage(im_lq_bs))  # move to latent space
-							text_init = ['']*opt.n_samples
+
+							if opt.use_posi_prompt:
+									# text_init = ['(masterpiece:2), (best quality:2), (realistic:2), (very clear:2)']*im_lq_pch.size(0)
+									text_init = ['Good photo.']*im_lq_bs.size(0)
+							else:
+								text_init = ['']*im_lq_bs.size(0)
+
 							semantic_c = model.cond_stage_model(text_init)
+							
+							
+							if opt.use_negative_prompt:
+								negative_text_init = ['3d, cartoon, anime, sketches, (worst quality:2), (low quality:2)']*im_lq_bs.size(0)
+								# negative_text_init = ['Bad photo.']*im_lq_bs.size(0)
+								nega_semantic_c = model.cond_stage_model(negative_text_init)
+
 							noise = torch.randn_like(init_latent)
 							# If you would like to start from the intermediate steps, you can add noise to LR to the specific steps.
 							t = repeat(torch.tensor([999]), '1 -> b', b=im_lq_bs.size(0))
 							t = t.to(device).long()
-							# x_T = model.q_sample_respace(x_start=init_latent, t=t, sqrt_alphas_cumprod=sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod=sqrt_one_minus_alphas_cumprod, noise=noise)
 							x_T = model.q_sample(x_start=init_latent, t=t, noise=noise)
 							# x_T = None
-							samples, _ = sampler.sample(t, init_latent.size(0), (3,init_latent.size(2),init_latent.size(3)), semantic_c, eta=opt.ddim_eta, verbose=False, x_T=x_T)
-
-							
-							# samples, _ = model.sample_canvas(cond=semantic_c, struct_cond=init_latent, batch_size=im_lq_bs.size(0), timesteps=opt.ddpm_steps, time_replace=opt.ddpm_steps, x_T=x_T, return_intermediates=True, tile_size=int(opt.input_size/8), tile_overlap=opt.tile_overlap, batch_size_sample=opt.n_samples)
-							
-							# _, enc_fea_lq = vq_model.encode(im_lq_bs)
-							# x_samples = vq_model.decode(samples * 1. / model.scale_factor, enc_fea_lq)
-
-							# x_samples = vq_model.decode(enc_fea_lq, enc_fea_lq)
+							samples, _ = sampler.ddim_sampling_sr_t_naive(cond=semantic_c,
+															# struct_cond=init_latent,
+															shape=init_latent.shape,
+															unconditional_conditioning=nega_semantic_c if opt.use_negative_prompt else None,
+															unconditional_guidance_scale=opt.scale if opt.use_negative_prompt else None,
+															timesteps=np.array(ddim_timesteps),
+															x_T=x_T,
+															tile_size=opt.input_size//8,
+															tile_overlap=opt.tile_overlap,
+															batch_size=opt.n_samples)
 
 							x_samples = model.decode_first_stage(samples)
 
