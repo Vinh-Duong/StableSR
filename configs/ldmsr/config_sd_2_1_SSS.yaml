@@ -14,11 +14,11 @@ model:
     image_size: 512
     channels: 4
     concat_mode: True
-    ckpt_path: ./logs/2024-10-12T19-06-25_SD_2_1_hybrid/checkpoints/epoch=000010.ckpt
+    # ckpt_path: ./logs/2024-10-12T19-06-25_SD_2_1_hybrid/checkpoints/epoch=000010.ckpt
     cond_stage_trainable: false
     use_usm: True
     ignore_keys: ['jpeger']
-    conditioning_key: hybrid
+    conditioning_key: concat
     unfrozen_diff: false
     scale_factor: 0.18215
     use_ema: False
@@ -39,7 +39,7 @@ model:
         image_size: 32 # unused
         in_channels: 8
         out_channels: 4
-        model_channels: 320
+        model_channels: 160
         attention_resolutions: [ 4, 2, 1 ]
         num_res_blocks: 2
         channel_mult: [ 1, 2, 4, 4 ]
@@ -58,7 +58,7 @@ model:
       params:
         image_size: 32 # unused
         in_channels: 8
-        out_channels: 4
+        out_channels: 8
         model_channels: 320
         attention_resolutions: [ 4, 2, 1 ]
         num_res_blocks: 2
@@ -67,7 +67,7 @@ model:
 
         use_spatial_transformer: True
         use_linear_in_transformer: True
-        transformer_depth: 1
+        transformer_depth: [1, 2, 4]
         context_dim: 1024
         use_checkpoint: False
         legacy: False
@@ -77,12 +77,12 @@ model:
       target: ldm.models.autoencoder.AutoencoderKL
       params:
         # for training only
-        ckpt_path: ./logs/2024-10-12T19-06-25_SD_2_1_hybrid/checkpoints/epoch=000010.ckpt
+        # ckpt_path: ./logs/2024-10-12T19-06-25_SD_2_1_hybrid/checkpoints/epoch=000010.ckpt
         embed_dim: 4
         # monitor: val/rec_loss
         ddconfig:
           double_z: true
-          z_channels: 4
+          z_channels: 8
           resolution: 512
           in_channels: 3
           out_ch: 3

@@ -702,6 +702,8 @@ class LatentDiffusion(DDPM):
             self.init_from_ckpt(ckpt_path, ignore_keys)
             self.restarted_from_ckpt = True
 
+        
+
         # self.model.eval()
         # self.model.train = disabled_train
         # for param in self.model.parameters():
@@ -1779,6 +1781,11 @@ class LatentDiffusionSR(DDPM):
                             print(name)
                             param.requires_grad = True
 
+        # print('save checkpoint')
+        # torch.save({'state_dict': self.first_stage_model.state_dict(),
+        #             # 'state_dict': self.model.state_dict(),
+        #             }
+        #             , 'AUE.ckpt')
 
         if self.distill_unet:
             # self.teacher_unet_ckpt = unet_config_teacher.ckpt_path
@@ -2712,7 +2719,9 @@ class LatentDiffusionSR(DDPM):
             prefix = 'train' if self.training else 'val'
 
             target = model_output_teacher
+            
             model_output = self.apply_model(x_noisy, t, cond)
+            # model_output = self.predict_start_from_noise(x_noisy, t, model_output)
             
         else:
             model_output = self.apply_model(x_noisy, t, cond)
